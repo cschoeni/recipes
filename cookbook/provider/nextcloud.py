@@ -1,15 +1,13 @@
-import base64
 import io
 import os
 import tempfile
 from datetime import datetime
-import webdav3.client as wc
-import requests
-from io import BytesIO
-from requests.auth import HTTPBasicAuth
 
+import requests
+import webdav3.client as wc
 from cookbook.models import Recipe, RecipeImport, SyncLog
 from cookbook.provider.provider import Provider
+from requests.auth import HTTPBasicAuth
 
 
 class Nextcloud(Provider):
@@ -22,6 +20,8 @@ class Nextcloud(Provider):
             'webdav_password': storage.password,
             'webdav_root': '/remote.php/dav/files/' + storage.username
         }
+        if storage.path != '':
+            options['webdav_root'] = storage.path
         return wc.Client(options)
 
     @staticmethod
@@ -34,14 +34,22 @@ class Nextcloud(Provider):
         import_count = 0
         for file in files:
             path = monitor.path + '/' + file
-            if not Recipe.objects.filter(file_path__iexact=path).exists() and not RecipeImport.objects.filter(
-                    file_path=path).exists():
+            if not Recipe.objects.filter(file_path__iexact=path, space=monitor.space).exists() and not RecipeImport.objects.filter(file_path=path, space=monitor.space).exists():
                 name = os.path.splitext(file)[0]
-                new_recipe = RecipeImport(name=name, file_path=path, storage=monitor.storage)
+                new_recipe = RecipeImport(
+                    name=name,
+                    file_path=path,
+                    storage=monitor.storage,
+                    space=monitor.space,
+                )
                 new_recipe.save()
                 import_count += 1
 
-        log_entry = SyncLog(status='SUCCESS', msg='Imported ' + str(import_count) + ' recipes', sync=monitor)
+        log_entry = SyncLog(
+            status='SUCCESS',
+            msg='Imported ' + str(import_count) + ' recipes',
+            sync=monitor,
+        )
         log_entry.save()
 
         monitor.last_checked = datetime.now()
@@ -51,7 +59,7 @@ class Nextcloud(Provider):
 
     @staticmethod
     def create_share_link(recipe):
-        url = recipe.storage.url + '/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json'
+        url = recipe.storage.url + '/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json'  # noqa: E501
 
         headers = {
             "OCS-APIRequest": "true",
@@ -60,8 +68,7 @@ class Nextcloud(Provider):
 
         data = {'path': recipe.file_path, 'shareType': 3}
 
-        r = requests.post(url, headers=headers, auth=HTTPBasicAuth(recipe.storage.username, recipe.storage.password),
-                          data=data)
+        r = requests.post(url, headers=headers, auth=HTTPBasicAuth(recipe.storage.username, recipe.storage.password), data=data)
 
         response_json = r.json()
 
@@ -69,14 +76,20 @@ class Nextcloud(Provider):
 
     @staticmethod
     def get_share_link(recipe):
-        url = recipe.storage.url + '/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json&path=' + recipe.file_path
+        url = recipe.storage.url + '/ocs/v2.php/apps/files_sharing/api/v1/shares?format=json&path=' + recipe.file_path  # noqa: E501
 
         headers = {
             "OCS-APIRequest": "true",
             "Content-Type": "application/json"
         }
 
-        r = requests.get(url, headers=headers, auth=HTTPBasicAuth(recipe.storage.username, recipe.storage.password))
+        r = requests.get(
+            url,
+            headers=headers,
+            auth=HTTPBasicAuth(
+                recipe.storage.username, recipe.storage.password
+            )
+        )
 
         response_json = r.json()
         for element in response_json['ocs']['data']:
@@ -91,7 +104,10 @@ class Nextcloud(Provider):
 
         tmp_file_path = tempfile.gettempdir() + '/' + recipe.name + '.pdf'
 
-        client.download_file(remote_path=recipe.file_path, local_path=tmp_file_path)
+        client.download_file(
+            remote_path=recipe.file_path,
+            local_path=tmp_file_path
+        )
 
         file = io.BytesIO(open(tmp_file_path, 'rb').read())
         os.remove(tmp_file_path)
@@ -102,8 +118,14 @@ class Nextcloud(Provider):
     def rename_file(recipe, new_name):
         client = Nextcloud.get_client(recipe.storage)
 
-        client.move(recipe.file_path,
-                    os.path.dirname(recipe.file_path) + '/' + new_name + os.path.splitext(recipe.file_path)[1])
+        client.move(
+            recipe.file_path,
+            "%s/%s%s" % (
+                os.path.dirname(recipe.file_path),
+                new_name,
+                os.path.splitext(recipe.file_path)[1]
+            )
+        )
 
         return True
 

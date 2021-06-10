@@ -1,16 +1,36 @@
 from django.contrib import admin
-from .models import *
+from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import User, Group
+
+from .models import (Comment, CookLog, Food, Ingredient, InviteLink, Keyword,
+                     MealPlan, MealType, NutritionInformation, Recipe,
+                     RecipeBook, RecipeBookEntry, RecipeImport, ShareLink,
+                     ShoppingList, ShoppingListEntry, ShoppingListRecipe,
+                     Space, Step, Storage, Sync, SyncLog, Unit, UserPreference,
+                     ViewLog, Supermarket, SupermarketCategory, SupermarketCategoryRelation,
+                     ImportLog, TelegramBot, BookmarkletImport)
+
+
+class CustomUserAdmin(UserAdmin):
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)
+
+admin.site.unregister(Group)
 
 
 class SpaceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'message')
+    list_display = ('name', 'created_by', 'message')
 
 
 admin.site.register(Space, SpaceAdmin)
 
 
 class UserPreferenceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'theme', 'nav_color', 'default_page', 'search_style', 'comments')
+    list_display = ('name', 'space', 'theme', 'nav_color', 'default_page', 'search_style',)
 
     @staticmethod
     def name(obj):
@@ -32,6 +52,18 @@ class SyncAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Sync, SyncAdmin)
+
+
+class SupermarketCategoryInline(admin.TabularInline):
+    model = SupermarketCategoryRelation
+
+
+class SupermarketAdmin(admin.ModelAdmin):
+    inlines = (SupermarketCategoryInline,)
+
+
+admin.site.register(Supermarket, SupermarketAdmin)
+admin.site.register(SupermarketCategory)
 
 
 class SyncLogAdmin(admin.ModelAdmin):
@@ -133,7 +165,10 @@ admin.site.register(ViewLog, ViewLogAdmin)
 
 
 class InviteLinkAdmin(admin.ModelAdmin):
-    list_display = ('username', 'group', 'valid_until', 'created_by', 'created_at', 'used_by')
+    list_display = (
+        'group', 'valid_until',
+        'created_by', 'created_at', 'used_by'
+    )
 
 
 admin.site.register(InviteLink, InviteLinkAdmin)
@@ -179,3 +214,24 @@ class NutritionInformationAdmin(admin.ModelAdmin):
 
 
 admin.site.register(NutritionInformation, NutritionInformationAdmin)
+
+
+class ImportLogAdmin(admin.ModelAdmin):
+    list_display = ('id', 'type', 'running', 'created_by', 'created_at',)
+
+
+admin.site.register(ImportLog, ImportLogAdmin)
+
+
+class TelegramBotAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name', 'created_by',)
+
+
+admin.site.register(TelegramBot, TelegramBotAdmin)
+
+
+class BookmarkletImportAdmin(admin.ModelAdmin):
+    list_display = ('id', 'url', 'created_by', 'created_at',)
+
+
+admin.site.register(BookmarkletImport, BookmarkletImportAdmin)

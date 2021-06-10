@@ -1,52 +1,93 @@
-import base64
-import json
 import re
-from json import JSONDecodeError
+import threading
+from io import BytesIO
 
 from django.contrib import messages
-from django.core.files.base import ContentFile
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
-from django.urls import reverse_lazy
+from django.urls import reverse
 from django.utils.translation import gettext as _
-from rest_framework.renderers import JSONRenderer
 
-from cookbook.forms import ExportForm, ImportForm
+from cookbook.forms import ExportForm, ImportForm, ImportExportBase
 from cookbook.helper.permission_helper import group_required
-from cookbook.models import Recipe
-from cookbook.serializer import RecipeSerializer
+from cookbook.integration.Pepperplate import Pepperplate
+from cookbook.integration.cheftap import ChefTap
+from cookbook.integration.chowdown import Chowdown
+from cookbook.integration.default import Default
+from cookbook.integration.domestica import Domestica
+from cookbook.integration.mealie import Mealie
+from cookbook.integration.mealmaster import MealMaster
+from cookbook.integration.nextcloud_cookbook import NextcloudCookbook
+from cookbook.integration.paprika import Paprika
+from cookbook.integration.recettetek import RecetteTek
+from cookbook.integration.recipesage import RecipeSage
+from cookbook.integration.rezkonv import RezKonv
+from cookbook.integration.safron import Safron
+from cookbook.models import Recipe, ImportLog, UserPreference
+
+
+def get_integration(request, export_type):
+    if export_type == ImportExportBase.DEFAULT:
+        return Default(request, export_type)
+    if export_type == ImportExportBase.PAPRIKA:
+        return Paprika(request, export_type)
+    if export_type == ImportExportBase.NEXTCLOUD:
+        return NextcloudCookbook(request, export_type)
+    if export_type == ImportExportBase.MEALIE:
+        return Mealie(request, export_type)
+    if export_type == ImportExportBase.CHOWDOWN:
+        return Chowdown(request, export_type)
+    if export_type == ImportExportBase.SAFRON:
+        return Safron(request, export_type)
+    if export_type == ImportExportBase.CHEFTAP:
+        return ChefTap(request, export_type)
+    if export_type == ImportExportBase.PEPPERPLATE:
+        return Pepperplate(request, export_type)
+    if export_type == ImportExportBase.DOMESTICA:
+        return Domestica(request, export_type)
+    if export_type == ImportExportBase.RECETTETEK:
+        return RecetteTek(request, export_type)
+    if export_type == ImportExportBase.RECIPESAGE:
+        return RecipeSage(request, export_type)
+    if export_type == ImportExportBase.REZKONV:
+        return RezKonv(request, export_type)
+    if export_type == ImportExportBase.MEALMASTER:
+        return MealMaster(request, export_type)
 
 
 @group_required('user')
 def import_recipe(request):
+    if request.space.max_recipes != 0 and Recipe.objects.filter(space=request.space).count() >= request.space.max_recipes: # TODO move to central helper function
+        messages.add_message(request, messages.WARNING, _('You have reached the maximum number of recipes for your space.'))
+        return HttpResponseRedirect(reverse('index'))
+
+    if request.space.max_users != 0 and UserPreference.objects.filter(space=request.space).count() > request.space.max_users:
+        messages.add_message(request, messages.WARNING, _('You have more users than allowed in your space.'))
+        return HttpResponseRedirect(reverse('index'))
+
     if request.method == "POST":
-        form = ImportForm(request.POST)
+        form = ImportForm(request.POST, request.FILES)
         if form.is_valid():
             try:
-                data = json.loads(re.sub(r'"id":([0-9])+,', '', form.cleaned_data['recipe']))
+                integration = get_integration(request, form.cleaned_data['type'])
 
-                sr = RecipeSerializer(data=data)
-                if sr.is_valid():
-                    sr.validated_data['created_by'] = request.user
-                    recipe = sr.save()
+                il = ImportLog.objects.create(type=form.cleaned_data['type'], created_by=request.user, space=request.space)
+                files = []
+                for f in request.FILES.getlist('files'):
+                    files.append({'file': BytesIO(f.read()), 'name': f.name})
+                t = threading.Thread(target=integration.do_import, args=[files, il, form.cleaned_data['duplicates']])
+                t.setDaemon(True)
+                t.start()
 
-                    if data['image']:
-                        try:
-                            fmt, img = data['image'].split(';base64,')
-                            ext = fmt.split('/')[-1]
-                            recipe.image = ContentFile(base64.b64decode(img), name=f'{recipe.pk}.{ext}')  # TODO possible security risk, maybe some checks needed
-                            recipe.save()
-                        except ValueError:
-                            pass
-
-                    messages.add_message(request, messages.SUCCESS, _('Recipe imported successfully!'))
-                    return HttpResponseRedirect(reverse_lazy('view_recipe', args=[recipe.pk]))
-                else:
-                    messages.add_message(request, messages.ERROR, _('Something went wrong during the import!'))
-                    messages.add_message(request, messages.WARNING, sr.errors)
-            except JSONDecodeError:
-                messages.add_message(request, messages.ERROR, _('Could not parse the supplied JSON!'))
-
+                return JsonResponse({'import_id': [il.pk]})
+            except NotImplementedError:
+                return JsonResponse(
+                    {
+                        'error': True,
+                        'msg': _('Importing is not implemented for this provider')
+                    },
+                    status=400
+                )
     else:
         form = ImportForm()
 
@@ -55,36 +96,29 @@ def import_recipe(request):
 
 @group_required('user')
 def export_recipe(request):
-    context = {}
     if request.method == "POST":
-        form = ExportForm(request.POST)
+        form = ExportForm(request.POST, space=request.space)
         if form.is_valid():
-            recipe = form.cleaned_data['recipe']
-            if recipe.internal:
-                export = RecipeSerializer(recipe).data
+            try:
+                recipes = form.cleaned_data['recipes']
+                if form.cleaned_data['all']:
+                    recipes = Recipe.objects.filter(space=request.space, internal=True).all()
+                integration = get_integration(request, form.cleaned_data['type'])
+                return integration.do_export(recipes)
+            except NotImplementedError:
+                messages.add_message(request, messages.ERROR, _('Exporting is not implemented for this provider'))
 
-                if recipe.image and form.cleaned_data['image']:
-                    with open(recipe.image.path, 'rb') as img_f:
-                        export['image'] = f'data:image/png;base64,{base64.b64encode(img_f.read()).decode("utf-8")}'
-
-                json_string = JSONRenderer().render(export).decode("utf-8")
-
-                if form.cleaned_data['download']:
-                    response = HttpResponse(json_string, content_type='text/plain')
-                    response['Content-Disposition'] = f'attachment; filename={recipe.name}.json'
-                    return response
-
-                context['export'] = re.sub(r'"id":([0-9])+,', '', json_string)
-            else:
-                form.add_error('recipe', _('External recipes cannot be exported, please share the file directly or select an internal recipe.'))
     else:
-        form = ExportForm()
+        form = ExportForm(space=request.space)
         recipe = request.GET.get('r')
         if recipe:
             if re.match(r'^([0-9])+$', recipe):
-                if recipe := Recipe.objects.filter(pk=int(recipe)).first():
-                    form = ExportForm(initial={'recipe': recipe})
+                if recipe := Recipe.objects.filter(pk=int(recipe), space=request.space).first():
+                    form = ExportForm(initial={'recipes': recipe}, space=request.space)
 
-    context['form'] = form
+    return render(request, 'export.html', {'form': form})
 
-    return render(request, 'export.html', context)
+
+@group_required('user')
+def import_response(request, pk):
+    return render(request, 'import_response.html', {'pk': pk})

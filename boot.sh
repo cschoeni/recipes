@@ -3,6 +3,7 @@ source venv/bin/activate
 
 echo "Updating database"
 python manage.py migrate
+python manage.py collectstatic_js_reverse
 python manage.py collectstatic --noinput
 echo "Done"
 

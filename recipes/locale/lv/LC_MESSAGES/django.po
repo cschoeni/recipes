@@ -2,13 +2,13 @@
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 # FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
-# 
+#
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-31 18:41+0200\n"
+"POT-Creation-Date: 2021-04-11 15:09+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -19,34 +19,42 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=(n%10==1 && n%100!=11 ? 0 : n != 0 ? 1 : "
 "2);\n"
 
-#: .\recipes\settings.py:175
-msgid "English"
+#: .\recipes\settings.py:220
+msgid "Armenian "
 msgstr ""
 
-#: .\recipes\settings.py:176
-msgid "German"
-msgstr ""
-
-#: .\recipes\settings.py:177
-msgid "Dutch"
-msgstr ""
-
-#: .\recipes\settings.py:178
-msgid "French"
-msgstr ""
-
-#: .\recipes\settings.py:179
+#: .\recipes\settings.py:221
 msgid "Catalan"
 msgstr ""
 
-#: .\recipes\settings.py:180
-msgid "Spanish"
+#: .\recipes\settings.py:222
+msgid "Czech"
 msgstr ""
 
-#: .\recipes\settings.py:181
+#: .\recipes\settings.py:223
+msgid "Dutch"
+msgstr ""
+
+#: .\recipes\settings.py:224
+msgid "English"
+msgstr ""
+
+#: .\recipes\settings.py:225
+msgid "French"
+msgstr ""
+
+#: .\recipes\settings.py:226
+msgid "German"
+msgstr ""
+
+#: .\recipes\settings.py:227
 msgid "Italian"
 msgstr ""
 
-#: .\recipes\settings.py:182
+#: .\recipes\settings.py:228
 msgid "Latvian"
+msgstr ""
+
+#: .\recipes\settings.py:229
+msgid "Spanish"
 msgstr ""

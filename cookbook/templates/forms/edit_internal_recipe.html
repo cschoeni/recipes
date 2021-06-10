@@ -35,7 +35,11 @@
 
     <div v-if="!recipe" class="text-center">
         <br/>
-        <i class="fas fa-spinner fa-spin fa-8x"></i>
+        {% if not request.user.is_authenticated or request.user.userpreference.theme == request.user.userpreference.TANDOOR %}
+            <img class="spinner-tandoor"/>
+        {% else %}
+            <i class="fas fa-spinner fa-spin fa-8x"></i>
+        {% endif %}
     </div>
 
     <div v-if="recipe">
@@ -44,6 +48,16 @@
             <div class="col-md-12">
                 <label for="id_name"> {% trans 'Name' %}</label>
                 <input class="form-control" id="id_name" v-model="recipe.name">
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <label for="id_description">
+                    {% trans 'Description' %}
+                </label>
+                <textarea id="id_description" class="form-control" v-model="recipe.description"
+                          maxlength="512"></textarea>
+
             </div>
         </div>
         <br/>
@@ -65,6 +79,9 @@
                 <label for="id_name"> {% trans 'Servings' %}</label>
                 <input class="form-control" id="id_servings" v-model="recipe.servings">
                 <br/>
+                <label for="id_name"> {% trans 'Servings Text' %}</label>
+                <input class="form-control" id="id_servings_text" v-model="recipe.servings_text" maxlength="32">
+                <br/>
                 <label for="id_name"> {% trans 'Keywords' %}</label>
                 <multiselect
                         v-model="recipe.keywords"
@@ -74,6 +91,9 @@
                         :hide-selected="true"
                         :preserve-search="true"
                         placeholder="{% trans 'Select Keywords' %}"
+                        tag-placeholder="{% trans 'Add Keyword' %}"
+                        :taggable="true"
+                        @tag="addKeyword"
                         label="label"
                         track-by="id"
                         id="id_keywords"
@@ -83,6 +103,7 @@
                 </multiselect>
             </div>
         </div>
+
         <template v-if="recipe !== undefined">
             <div class="row" v-if="recipe.nutrition" style="margin-top: 1vh">
                 <div class="col-md-12">
@@ -325,6 +346,11 @@
                                                                         @click="ingredient.no_amount = false"><i
                                                                         class="fas fa-balance-scale-right fa-fw"></i> {% trans 'Enable Amount' %}
                                                                 </button>
+                                                                <button type="button" class="dropdown-item"
+                                                                        @click="copyTemplateReference(index, ingredient)">
+                                                                    <i
+                                                                            class="fas fa-code"></i> {% trans 'Copy Template Reference' %}
+                                                                </button>
                                                             </div>
 
                                                         </div>
@@ -337,7 +363,7 @@
                                     <div class="row">
                                         <div class="col-md-2 offset-md-5"
                                              style="text-align: center; margin-top: 8px;">
-                                            <button class="btn btn-dark btn-block" @click="addIngredient(step)"><i
+                                            <button class="btn btn-success btn-block" @click="addIngredient(step)"><i
                                                     class="fa fa-plus"></i>
                                             </button>
                                         </div>
@@ -387,6 +413,9 @@
 
 {% block content_xl_right %}
     <div class="sticky-top" style="top: 2vh; z-index: 100;" v-if="recipe !== undefined">
+        <br/>
+        <br/>
+        <br/>
         <div class="row">
             <div class="col-md-11">
                 <button type="button" @click="updateRecipe(true)"
@@ -442,7 +471,7 @@
 {% endblock %}
 
 {% block script %}
-    
+
     <script src="{% url 'javascript-catalog' %}"></script>
     <script type="application/javascript">
         let csrftoken = Cookies.get('csrftoken');
@@ -568,7 +597,7 @@
 
                         }).catch((err) => {
                             console.log(err)
-                            this.makeToast(gettext('Error'), gettext('There was an error updating the recipe!') + err.body.image, 'danger')
+                            this.makeToast(gettext('Error'), gettext('There was an error updating the recipe!') + err.bodyText, 'danger')
                         })
 
                         let reader = new FileReader();
@@ -642,6 +671,10 @@
                     this.units.push(new_unit.unit)
                     this.recipe.steps[step].ingredients[id] = new_unit
                 },
+                addKeyword: function (tag) {
+                    let new_keyword = {'label': tag, 'name': tag}
+                    this.recipe.keywords.push(new_keyword)
+                },
                 searchKeywords: function (query) {
                     this.keywords_loading = true
                     this.$http.get("{% url 'api:keyword-list' %}" + '?query=' + query + '&limit=10').then((response) => {
@@ -699,6 +732,19 @@
                 },
                 removeNutrition: function () {
                     this.recipe.nutrition = null
+                },
+                copyTemplateReference: function (index, ingredient) {
+                    const el = document.createElement('textarea');
+
+                    let tag = `\u007B\u007B ingredients[${index}] \u007D\u007D`;
+                    if (ingredient.food !== null) {
+                        tag += `\u007B# ${ingredient.food.name} #\u007D`
+                    }
+                    el.value = tag
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
                 }
             }
         });

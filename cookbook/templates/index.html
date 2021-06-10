@@ -44,7 +44,7 @@
                                                 class="fas fa-plus-circle fa-fw"></i> {% trans 'New Recipe' %}</button>
                                         <button class="dropdown-item" type="button"
                                                 onclick="location.href='{% url 'data_import_url' %}'"><i
-                                                class="fas fa-cloud-download-alt fa-fw"></i> {% trans 'Website Import' %}
+                                                class="fas fa-cloud-download-alt fa-fw"></i> {% trans 'Import Recipe' %}
                                         </button>
                                         <button data-toggle="collapse" href="#collapse_adv_search"
                                                 role="button" class="dropdown-item"
@@ -91,7 +91,7 @@
         {% render_table recipes %}
     {% else %}
         <div class="alert alert-danger" role="alert">
-            {% trans "Log in to view recipes" %}
+            {% trans "Log in to view recipes" %} <br/>
         </div>
     {% endif %}
 
